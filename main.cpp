@@ -2,5 +2,14 @@
 #include <iostream>
 
 int main() {
-  return 0;
+  string img_path;
+
+  cout << "Please enter the path of the file you would like to edit: ";
+  cin >> img_path;
+
+  Mat image = imread(img_path, IMREAD_COLOR);
+  imshow("Display Window", image);
+
+  int k = waitkey(0);
+
 }
