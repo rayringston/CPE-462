@@ -56,24 +56,10 @@ Mat medianFilter(Mat img, const int n = 3) {
 	return temp;
 }
 
-Mat contrastStretching(Mat img) {
+Mat contrastStretching(Mat img, int r1, int r2, int s1 ,int s2) {
 	Mat temp = img.clone();
 
 	// s = T(r)
-	int r1, r2, s1, s2;
-
-	cout << "Enter the first input gray level: ";
-	cin >> r1;
-
-	cout << "Enter the corresponding output level: ";
-	cin >> s1;
-
-	cout << "Enter the second input gray level: ";
-	cin >> r2;
-
-	cout << "Enter the corresponding output level: ";
-	cin >> s2;
-	
 	float alpha = s1 / r2;
 	float beta = (s2 - s1) / (r2 - r1);
 	float gamma = (255 - s2) / (255 - r2);
@@ -89,6 +75,35 @@ Mat contrastStretching(Mat img) {
 			else {
 				temp.at<uchar>(y, x) = gamma * (temp.at<uchar>(y, x) - r2) + s2;
 			}
+		}
+	}
+
+	return temp;
+}
+
+Mat histogramEqualization(Mat img) {
+	Mat temp = img.clone();
+	float freqs[256] = { 0 };
+
+	// Creates a list containing the frequency of each gray scale level
+	for (int x = 0; x < temp.cols; x++) {
+		for (int y = 0; y < temp.rows; y++) {
+			freqs[temp.at<uchar>(y, x)] += 1;
+		}
+	}
+
+	for (int i = 0; i < 256; i++) {
+		freqs[i] = freqs[i] / (temp.cols * temp.rows);
+	}
+
+	for (int x = 0; x < temp.cols; x++) {
+		for (int y = 0; y < temp.rows; y++) {
+			float sum = 0;
+			for (int i = 0; i < temp.at<uchar>(y, x); i++) {
+				sum += freqs[i];
+			}
+
+			temp.at<uchar>(y, x) = round(255 * sum);
 		}
 	}
 
@@ -129,7 +144,6 @@ Mat saltPepper(Mat img, float intensity = 0.02, int type = 0) {
 	return temp;
 }
 
-
 Mat gaussianBlur(Mat img) {
 	// Uses a mask to create a blur
 	Mat mask = (Mat_<double>(3, 3) << 1, 1, 1, 1, 1, 1, 1, 1, 1);
@@ -149,7 +163,7 @@ Mat speckleNoise(Mat img, float sigma) {
 
 	for (int x = 0; x < temp.cols; x++) {
 		for (int y = 0; y < temp.rows; y++) {
-			temp.at<uchar>(y, x) = round(temp.at<uchar>(y, x) * abs(dist(gen)));
+			temp.at<uchar>(y, x) = (int) round(temp.at<uchar>(y, x) * abs(dist(gen)));
 			if (temp.at<uchar>(y, x) < 0) temp.at<uchar>(y, x) = 0;
 			if (temp.at<uchar>(y, x) > 255) temp.at<uchar>(y, x) = 255;
 		}
@@ -159,35 +173,6 @@ Mat speckleNoise(Mat img, float sigma) {
 }
 
 // ----------------- Misc. Functions -------------------- //
-
-Mat histogramEqualization(Mat img) {
-	Mat temp = img.clone();
-	float freqs[256] = { 0 };
-
-	// Creates a list containing the frequency of each gray scale level
-	for (int x = 0; x < temp.cols; x++) {
-		for (int y = 0; y < temp.rows; y++) {
-			freqs[temp.at<uchar>(y, x)] += 1;
-		}
-	}
-
-	for (int i = 0; i < 256; i++) {
-		freqs[i] = freqs[i] / (temp.cols * temp.rows);
-	}
-
-	for (int x = 0; x < temp.cols; x++) {
-		for (int y = 0; y < temp.rows; y++) {
-			float sum = 0;
-			for (int i = 0; i < temp.at<uchar>(y, x); i++) {
-				sum += freqs[i];
-			}
-
-			temp.at<uchar>(y, x) = round(255 * sum);
-		}
-	}
-
-	return temp;
-}
 
 void checkEqualization(Mat img1, Mat img2) {
 	float freqs1[256] = { 0 };
@@ -205,8 +190,65 @@ void checkEqualization(Mat img1, Mat img2) {
 	}
 }
 
+Mat thresholding(Mat img, int upperlimit=255, int lowerlimit=0) {
+	Mat temp = img.clone();
+	for (int x = 0; x < img.cols; x++) {
+		for (int y = 0; y < img.rows; y++) {
+			if (temp.at<uchar>(y, x) <= lowerlimit) {
+				temp.at<uchar>(y, x) = 0;
+			}
+			if (temp.at<uchar>(y, x) >= upperlimit) {
+				temp.at<uchar>(y, x) = 255;
+			}
+		}
+	}
+	return temp;
+}
+
+Mat quantization(Mat img, int bins) {
+	Mat temp = img.clone();
+
+	for (int x = 0; x < temp.cols; x++) {
+		for (int y = 0; y < temp.rows; y++) {
+			temp.at<uchar>(y, x) = (uchar) round((255.0 / (bins - 1)) * round(bins * temp.at<uchar>(y, x) / 255.0));
+		}
+	}
+
+	return temp;
+}
+
+Mat edgeDetection(Mat img) {
+	Mat sobelX = (Mat_<double>(3, 3) << -1, 0, 1, -2, 0, 2, -1, 0, 1);
+	Mat sobelY = (Mat_<double>(3, 3) << 1, 2, 1, 0, 0, 0, -1, -2, -1);
+
+	Mat temp = img.clone();
+	Mat tempX, tempY, final = temp;
+
+	filter2D(temp, tempX, -1, sobelX);
+	filter2D(temp, tempY, -1, sobelY);
+
+	double xSq, ySq, sum, finalVal;
+
+	for (int x = 0; x < temp.cols; x++) {
+		for (int y = 0; y < temp.rows; y++) {
+
+			xSq = pow(((double)tempX.at<uchar>(y, x) / 255.0), 2);
+			ySq = pow(((double)tempY.at<uchar>(y, x) / 255.0), 2);
+			sum = xSq + ySq;
+			finalVal = 255.0 * sqrt(sum);
+
+			final.at<uchar>(y, x) = (uchar)round(finalVal);
+		}
+	}
+
+	return final;
+}
+
+// ----------------- Main ------------------- //
+
 int main() {
 	int running = 1;
+	int displaying = 1;
 
 	Mat originalImg = imread("C:\\Users\\rayri\\Downloads\\lenna.png", 0);
 	Mat edited = originalImg;
@@ -217,19 +259,27 @@ int main() {
 	}
 
 	while (running == 1) {
+		displaying = 1;
 		system("CLS");
 
 		cout << "Please select which image technique you would like to use:" << endl;
 		cout << "0. Exit" << endl;
+		cout << "<---------- Enhancement Tools" << endl;
 		cout << "1. Sharpen" << endl;
 		cout << "2. Median Filtering" << endl;
 		cout << "3. Gamma Correction" << endl;
 		cout << "4. Histogram Equalization" << endl;
 		cout << "5. Contrast Stretching" << endl;
+		cout << "<---------- Error Testing Tools" << endl;
 		cout << "6. Gaussian Blur" << endl;
 		cout << "7. Salt and Pepper Noise" << endl;
 		cout << "8. Speckle Noise" << endl;
+		cout << "<---------- Miscellaneous Tools" << endl;
+		cout << "9. Thresholding" << endl;
+		cout << "10. Quantization" << endl;
+		cout << "11. Edge Detection" << endl;
 		cout << "-1. Reset to Original" << endl;
+		cout << "\n\n";
 
 		string input;
 		cin >> input;
@@ -259,17 +309,59 @@ int main() {
 			edited = medianFilter(edited);
 			break;
 		case 3:
-			cout << "Enter a decimal value for gamma: ";
-			cin >> choice;
+			try {
+				cout << "Enter a decimal value for gamma: ";
+				cin >> choice;
+				edited = gammaCorrection(edited, stof(choice));
+			}
+			catch (const invalid_argument& error) {
+				cout << "\nError: This value must be a decimal." << endl;
+				cout << "Press ENTER to continue." << endl;
 
-			edited = gammaCorrection(edited, stof(choice));
+				// Got help with this online, after the bad read from the try, need to clear and ingore the flags in the cin
+				// Then I wait for an enter with the cin.get
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.get();
+				displaying = 0;
+			}
+
 			break;
 		case 4:
 			edited = histogramEqualization(edited);
-			checkEqualization(originalImg, edited);
+			//checkEqualization(originalImg, edited);
 			break;
 		case 5:
-			edited = contrastStretching(edited);
+			int r1, r2, s1, s2;
+			try {
+				cout << "Enter the first input gray level: ";
+				cin >> choice;
+				r1 = stoi(choice);
+
+				cout << "Enter the corresponding output level: ";
+				cin >> choice;
+				s1 = stoi(choice);
+
+				cout << "Enter the second input gray level: ";
+				cin >> choice;
+				r2= stoi(choice);
+
+				cout << "Enter the corresponding output level: ";
+				cin >> choice;
+				s2 = stoi(choice);
+
+				edited = contrastStretching(edited, r1, r2, s1, s2);
+			}
+			catch (const invalid_argument& error) {
+				cout << "Error: This value must be an integer." << endl;
+				cout << "Press ENTER to continue." << endl;
+
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.get();
+				displaying = 0;
+			}
+			
 			break;
 		case 6:
 			edited = gaussianBlur(edited);
@@ -294,7 +386,13 @@ int main() {
 					cout << "check";
 				}
 				catch (const invalid_argument& error) {
-					cout << "\nError: One of the arguments you entered was invalid, the process was cancelled.\n";
+					cout << "Error: One of the arguments you entered was invalid, the process was cancelled." << endl;
+					cout << "Press ENTER to continue." << endl;
+
+					cin.clear();
+					cin.ignore(numeric_limits<streamsize>::max(), '\n');
+					cin.get();
+					displaying = 0;
 				}
 			}
 			else {
@@ -302,19 +400,78 @@ int main() {
 			}
 			break;
 		case 8:
-			cout << "Please enter the variance of the normal distribution: ";
-			cin >> choice;
-			edited = speckleNoise(edited, stof(choice));
-			break;
+			try {
+				cout << "Please enter the variance of the normal distribution: ";
+				cin >> choice;
+				edited = speckleNoise(edited, stof(choice));
+			}
+			catch (const invalid_argument& error) {
+				cout << "Error: This value must a demical." << endl;
+				cout << "Press ENTER to continue." << endl;
 
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.get();
+				displaying = 0;
+			}
+
+			break;
+		case 9:
+			int lowerlimit, upperlimit;
+			try {
+				cout << "What is the value limit for the black threshold (0 has no effect): ";
+				cin >> choice;
+				lowerlimit = stoi(choice);
+
+				cout << "What is the vaule limit for the white threshold (255 has no effect): ";
+				cin >> choice;
+				upperlimit = stoi(choice);
+
+				edited = thresholding(edited, upperlimit, lowerlimit);
+			}
+			catch (const invalid_argument& error) {
+				cout << "Error: This value must an integer." << endl;
+				cout << "Press ENTER to continue." << endl;
+
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.get();
+				displaying = 0;
+			}
+
+			break;
+		case 10:
+			int bins;
+			try {
+				cout << "How many distinct levels would you like (standard is 255): ";
+				cin >> choice;
+				bins = stoi(choice);
+				edited = quantization(edited, bins);
+			}
+			catch (const invalid_argument& error) {
+				cout << "Error: This value must an integer." << endl;
+				cout << "Press ENTER to continue." << endl;
+
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.get();
+				displaying = 0;
+			}
+			break;
+		case 11:
+			edited = edgeDetection(edited);
+			break;
 		case -1:
 			edited = originalImg;
 			break;
 		}
+
 		Mat concatImg;
 		hconcat(originalImg, edited, concatImg);
 
-		imshow("Original | Edited", concatImg);
+		if (displaying == 1) {
+			imshow("Original | Edited", concatImg);
+		}
 
 		waitKey(0);
 	}
