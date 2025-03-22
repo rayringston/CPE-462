@@ -2,6 +2,11 @@
 #include <iostream>
 #include <random>
 
+// Found online, turns off the debug message in OpenCV
+// For some reason these default to on
+#include <opencv2/core/utils/logger.hpp>
+cv::utils::logging::LogLevel level = cv::utils::logging::setLogLevel((cv::utils::logging::LogLevel) 0);
+
 using namespace std;
 using namespace cv;
 
@@ -210,7 +215,7 @@ Mat quantization(Mat img, int bins) {
 
 	for (int x = 0; x < temp.cols; x++) {
 		for (int y = 0; y < temp.rows; y++) {
-			temp.at<uchar>(y, x) = (uchar) round((255.0 / (bins - 1)) * round(bins * temp.at<uchar>(y, x) / 255.0));
+			temp.at<uchar>(y, x) = (uchar) round((255.0 / (bins - 1)) * round((bins - 1) * temp.at<uchar>(y, x) / 255.0));
 		}
 	}
 
@@ -244,14 +249,73 @@ Mat edgeDetection(Mat img) {
 	return final;
 }
 
+tuple<Mat, Mat> getImgFromFile(int quit, Mat oldImg, Mat oldEdited) {
+	string filePath = "";
+	Mat img;
+
+	while (true) {
+		if (quit == 1) cout << "Please enter the path to your desired image (Q to cancel): ";
+		else cout << "Please enter the path to your desired image: ";
+		
+		cin >> filePath;
+
+		if (quit == 1 and (filePath == "q" or filePath == "Q")) {
+			return {oldImg, oldEdited};
+		}
+
+		// These lines are to make sure the file path is in the right format
+		// OpenCV is really picky with that
+		string tempPath;
+		for (int i = 0; i < filePath.size(); i++) {
+			if (filePath[i] == '/' and filePath[i + 1] != '/') {
+				tempPath += "\\\\";
+			}
+			else if (filePath[i] == '\\' and filePath[i + 1] != '\\') {
+				tempPath += "\\\\";
+			}
+			else if (filePath[i] == '\\' and filePath[i + 1] == '\\') {
+			}
+			else if (filePath[i] == '/' and filePath[i + 1] == '/') {
+			}
+			else {
+				tempPath += filePath[i];
+			}
+		}
+		filePath = tempPath;
+		img = imread(filePath, 0);
+		if (img.empty()) {
+			
+			cout << "Error: That is not a valid path, please write it from the root directory." << endl;
+			cout << "Press ENTER to continue" << endl;
+
+			cin.clear();
+			cin.ignore(numeric_limits<streamsize>::max(), '\n');
+			cin.get();
+			continue;
+		}
+		break;
+	}
+
+	return {img, img};
+}
+
 // ----------------- Main ------------------- //
 
-int main() {
+int main(int argc, char* argv[]) {
 	int running = 1;
 	int displaying = 1;
+	Mat originalImg, edited;
 
-	Mat originalImg = imread("C:\\Users\\rayri\\Downloads\\lenna.png", 0);
-	Mat edited = originalImg;
+	if (argc >= 2) {
+		originalImg = imread(argv[1], 0);
+		edited = originalImg;
+	}
+
+	if (originalImg.empty()) {
+		tie(originalImg,edited) = getImgFromFile(0, originalImg, originalImg);
+	}
+
+	//     C:\\Users\\rayri\\Downloads\\lenna.png"
 
 	if (originalImg.empty()) {
 		cout << "Image not found";
@@ -278,7 +342,9 @@ int main() {
 		cout << "9. Thresholding" << endl;
 		cout << "10. Quantization" << endl;
 		cout << "11. Edge Detection" << endl;
+		cout << "<---------- Settings" << endl;
 		cout << "-1. Reset to Original" << endl;
+		cout << "-2. Change Image" << endl;
 		cout << "\n\n";
 
 		string input;
@@ -464,6 +530,9 @@ int main() {
 		case -1:
 			edited = originalImg;
 			break;
+		case -2:
+			tie(originalImg, edited) = getImgFromFile(1, originalImg, edited);
+			break;
 		}
 
 		Mat concatImg;
@@ -475,6 +544,22 @@ int main() {
 
 		waitKey(0);
 	}
+
+	string choice;
+	cout << "Would you like to save this edited image (Y/n): ";
+	cin >> choice;
+	/*
+	if (choice == "Y") {
+		cout << "Please write the full path of your destination." << endl;
+		cout << "It will be saved as a .jpg file, so do not include the extension: ";
+		cin >> choice;
+
+		imwrite(choice + ".jpg", edited);
+	}
+	*/
+	cout << "<-------------------------->" << endl;
+	cout << "Ray Ringstong & Ardit Cana" << endl;
+	cout << "<-------------------------->" << endl;
 
 	return 0;
 }
