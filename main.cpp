@@ -65,9 +65,11 @@ Mat contrastStretching(Mat img, int r1, int r2, int s1 ,int s2) {
 	Mat temp = img.clone();
 
 	// s = T(r)
-	float alpha = s1 / r2;
-	float beta = (s2 - s1) / (r2 - r1);
-	float gamma = (255 - s2) / (255 - r2);
+	float alpha = (float) s1 / r1;
+	float beta = (float) (s2 - s1) / (r2 - r1);
+	float gamma = (255.0 - s2) / (255.0 - r2);
+
+	cout << alpha << endl << beta << endl << gamma << endl;
 
 	for (int x = 0; x < temp.cols; x++) {
 		for (int y = 0; y < temp.rows; y++) {
@@ -427,6 +429,15 @@ int main(int argc, char* argv[]) {
 				cin.get();
 				displaying = 0;
 			}
+			catch (const out_of_range& error) {
+				cout << "Error: This value should be in the range of 0 - 255, inclusizve." << endl;
+				cout << "Press ENTER to continue." << endl;
+
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.get();
+				displaying = 0;
+			}
 			
 			break;
 		case 6:
@@ -516,6 +527,15 @@ int main(int argc, char* argv[]) {
 			}
 			catch (const invalid_argument& error) {
 				cout << "Error: This value must an integer." << endl;
+				cout << "Press ENTER to continue." << endl;
+
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cin.get();
+				displaying = 0;
+			}
+			catch (const out_of_range& error) {
+				cout << "Error: Any value of bins over 255 will not have any effect." << endl;
 				cout << "Press ENTER to continue." << endl;
 
 				cin.clear();
