@@ -327,7 +327,6 @@ int main(int argc, char* argv[]) {
 		system("CLS");
 
 		cout << "Please select which image technique you would like to use:" << endl;
-		cout << "0. Exit" << endl;
 		cout << "<---------- Enhancement Tools" << endl;
 		cout << "1. Sharpen" << endl;
 		cout << "2. Median Filtering" << endl;
@@ -343,6 +342,7 @@ int main(int argc, char* argv[]) {
 		cout << "10. Quantization" << endl;
 		cout << "11. Edge Detection" << endl;
 		cout << "<---------- Settings" << endl;
+		cout << "0. Exit" << endl;
 		cout << "-1. Reset to Original" << endl;
 		cout << "-2. Change Image" << endl;
 		cout << "\n\n";
@@ -558,7 +558,7 @@ int main(int argc, char* argv[]) {
 	}
 	*/
 	cout << "<-------------------------->" << endl;
-	cout << "Ray Ringstong & Ardit Cana" << endl;
+	cout << "Ray Ringston & Ardit Cana" << endl;
 	cout << "<-------------------------->" << endl;
 
 	return 0;
