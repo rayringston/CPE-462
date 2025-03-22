@@ -32,4 +32,4 @@ The gaussian blur function smooths the image by applying a simple convolution. I
 ### Edge Detection
 
 # Future Add
-Not sure
+Exporting the edited image
