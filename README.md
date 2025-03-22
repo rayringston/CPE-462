@@ -25,5 +25,11 @@ The gaussian blur function smooths the image by applying a simple convolution. I
 
 ### Speckle Noise
 
+# Miscellaneous Tools
+
+### Thresholding
+### Quantization
+### Edge Detection
+
 # Future Add
 Not sure
