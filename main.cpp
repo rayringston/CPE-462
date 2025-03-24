@@ -161,20 +161,17 @@ Mat gaussianBlur(Mat img) {
 }
 
 Mat speckleNoise(Mat img, float sigma) {
-	Mat temp = img.clone();
+	Mat temp;
+	Mat noise(img.size(), CV_8UC1);
+	
+	randn(noise, 0, sigma);
+	img.clone().convertTo(temp, CV_32FC1, 1.0 / 255.0);
 
-	// setup to generate the RVs for this type of noise
-	random_device rd;
-	mt19937 gen(rd());
-	normal_distribution<float> dist{1, sigma };
+	temp = temp + temp * noise;
 
-	for (int x = 0; x < temp.cols; x++) {
-		for (int y = 0; y < temp.rows; y++) {
-			temp.at<uchar>(y, x) = (int) round(temp.at<uchar>(y, x) * abs(dist(gen)));
-			if (temp.at<uchar>(y, x) < 0) temp.at<uchar>(y, x) = 0;
-			if (temp.at<uchar>(y, x) > 255) temp.at<uchar>(y, x) = 255;
-		}
-	}
+	normalize(temp, temp, 0, 1, NORM_MINMAX);
+
+	temp.convertTo(temp, CV_8UC1, 255);
 
 	return temp;
 }
@@ -197,6 +194,54 @@ void checkEqualization(Mat img1, Mat img2) {
 	}
 }
 
+void histogramPlot(Mat orig, Mat edited) {
+	int origVal[256] = { 0 }, editedVal[256] = { 0 };
+
+	for (int x = 0; x < orig.cols; x++) {
+		for (int y = 0; y < orig.rows; y++) {
+			origVal[orig.at<uchar>(y, x)] += 1;
+			editedVal[edited.at<uchar>(y, x)] += 1;
+		}
+	}
+
+	int width = 512 + 40;
+
+	// finding the max value in each histogram
+	// used to scale the plots
+	int maxVal1 = *max_element(origVal, origVal + 256);
+	int maxVal2 = *max_element(editedVal, editedVal + 256);
+	int maxVal = maxVal1 > maxVal2 ? maxVal1 : maxVal2;
+
+	Mat origHist(width, width, CV_8UC3, Scalar(255, 255, 255));
+
+	// add axes to the plots
+	arrowedLine(origHist, Point(20, width - 20), Point(20, 20), Scalar(0, 0, 0), 1, 8, 0, 0.02); // y axis
+	putText(origHist, "Frequency", Point(10, 15), FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0,0,0));
+
+	arrowedLine(origHist, Point(20, width - 20), Point(width - 20,width - 20), Scalar(0, 0, 0), 1, 8, 0, 0.02); // x axis
+	putText(origHist, "Intensity", Point(width - 70, width - 30), FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 0, 0));
+
+	// apply changes to both charts
+	Mat editedHist = origHist.clone();
+
+	// create line chart of all the histogram values
+	for (int i = 0; i < 255; i++) {
+
+		Point origP1(20 + i * 2, width - (20 + (int) (origVal[i] * 512 / maxVal)));
+		Point origP2(20 + i * 2 + 2, width - (20 + (int)(origVal[i+1] * 512 / maxVal)));
+		line(origHist, origP1, origP2, Scalar(255, 0, 0), 1);
+
+		Point editedP1(20 + i * 2, width - (20 + (int)(editedVal[i] * 512 / maxVal)));
+		Point editedP2(20 + i * 2 + 2, width - (20 + (int)(editedVal[i + 1] * 512 / maxVal)));
+		line(editedHist, editedP1, editedP2, Scalar(255, 0, 0), 1);
+	}
+
+	Mat concatImg;
+	hconcat(origHist, editedHist, concatImg);
+	
+	imshow("Original Histogram | Edited Histogram", concatImg);
+}
+
 Mat thresholding(Mat img, int upperlimit=255, int lowerlimit=0) {
 	Mat temp = img.clone();
 	for (int x = 0; x < img.cols; x++) {
@@ -217,7 +262,7 @@ Mat quantization(Mat img, int bins) {
 
 	for (int x = 0; x < temp.cols; x++) {
 		for (int y = 0; y < temp.rows; y++) {
-			temp.at<uchar>(y, x) = (uchar) round((255.0 / (bins - 1)) * round((bins - 1) * temp.at<uchar>(y, x) / 255.0));
+			temp.at<uchar>(y, x) = (uchar) round((255.0 / (bins - 1)) * round((bins - 1) * (float) temp.at<uchar>(y, x) / 255.0));
 		}
 	}
 
@@ -343,6 +388,7 @@ int main(int argc, char* argv[]) {
 		cout << "9. Thresholding" << endl;
 		cout << "10. Quantization" << endl;
 		cout << "11. Edge Detection" << endl;
+		cout << "12. Plot Histograms" << endl;
 		cout << "<---------- Settings" << endl;
 		cout << "0. Exit" << endl;
 		cout << "-1. Reset to Original" << endl;
@@ -478,7 +524,7 @@ int main(int argc, char* argv[]) {
 			break;
 		case 8:
 			try {
-				cout << "Please enter the variance of the normal distribution: ";
+				cout << "Please enter the variance of the normal distribution (Standard is 1): ";
 				cin >> choice;
 				edited = speckleNoise(edited, stof(choice));
 			}
@@ -547,6 +593,10 @@ int main(int argc, char* argv[]) {
 		case 11:
 			edited = edgeDetection(edited);
 			break;
+		case 12:
+			histogramPlot(originalImg, edited);
+			displaying = 0;
+			break;
 		case -1:
 			edited = originalImg;
 			break;
@@ -568,19 +618,22 @@ int main(int argc, char* argv[]) {
 	string choice;
 	cout << "Would you like to save this edited image (Y/n): ";
 	cin >> choice;
-	/*
+	
+	bool x;
+
 	if (choice == "Y") {
 		cout << "Please write the full path of your destination." << endl;
 		cout << "It will be saved as a .jpg file, so do not include the extension: ";
 		cin >> choice;
 
-		imwrite(choice + ".jpg", edited);
+		x = imwrite(choice + ".jpg", edited);
 	}
-	*/
+	
+	cout << "-----------------------------\n" << x << "-----------------------------\n";
+
 	cout << "<-------------------------->" << endl;
 	cout << "Ray Ringston & Ardit Cana" << endl;
 	cout << "<-------------------------->" << endl;
 
 	return 0;
 }
-
