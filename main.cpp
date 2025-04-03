@@ -161,18 +161,29 @@ Mat gaussianBlur(Mat img) {
 }
 
 Mat speckleNoise(Mat img, float sigma) {
-	Mat temp;
-	Mat noise(img.size(), CV_8UC1);
-	
+	Mat temp = img.clone();
+	Mat noise = Mat::zeros(temp.size(), CV_8UC1);
 	randn(noise, 0, sigma);
-	img.clone().convertTo(temp, CV_32FC1, 1.0 / 255.0);
 
-	temp = temp + temp * noise;
+	temp.convertTo(temp, CV_32FC1, 1 / 255.0);
+	noise.convertTo(noise, CV_32FC1, 1 / 255.0);
 
-	normalize(temp, temp, 0, 1, NORM_MINMAX);
+	// temp = temp + temp * noise
+
+	multiply(temp, noise, noise);
+	add(temp, noise, temp);
 
 	temp.convertTo(temp, CV_8UC1, 255);
 
+	return temp;
+}
+
+Mat additiveWhiteNoise(Mat img, float intensity) {
+	Mat temp = img.clone();
+	Mat noise = Mat::zeros(temp.size(), CV_8UC1);
+	randn(noise, 0, intensity);
+
+	add(temp, noise, temp);
 	return temp;
 }
 
@@ -242,19 +253,87 @@ void histogramPlot(Mat orig, Mat edited) {
 	imshow("Original Histogram | Edited Histogram", concatImg);
 }
 
-Mat thresholding(Mat img, int upperlimit=255, int lowerlimit=0) {
+Mat thresholding(Mat img, int limit=127, bool adaptive=0, bool segmented=0, int rows=3, int cols=3) {
 	Mat temp = img.clone();
-	for (int x = 0; x < img.cols; x++) {
-		for (int y = 0; y < img.rows; y++) {
-			if (temp.at<uchar>(y, x) <= lowerlimit) {
-				temp.at<uchar>(y, x) = 0;
-			}
-			if (temp.at<uchar>(y, x) >= upperlimit) {
-				temp.at<uchar>(y, x) = 255;
+
+	int rowWidth = floor(temp.rows / rows);
+	int colWidth = floor(temp.cols / cols);
+
+	if (segmented) {
+		for (int x = 0; x < rows; x++) {
+			for (int y = 0; y < cols; y++) {
+
+				int endRow =(x + 1) * rowWidth;
+				if (x == rows - 1) endRow = temp.rows;
+				int endCol = (y + 1) * colWidth;
+				if (y == cols - 1) endCol = temp.cols;
+
+				Mat chunk = temp(Range(x * rowWidth, endRow), Range(y * colWidth, endCol));
+
+				chunk = thresholding(chunk, 0, 1);
+
+				Rect roi(x * rowWidth, y * colWidth, chunk.rows, chunk.cols);
+				chunk.copyTo(temp(Range(x * rowWidth, endRow), Range(y * colWidth, endCol)));
+
+				temp(Range(x * rowWidth, endRow - 1), Range(y * colWidth, endCol - 1)) = chunk;
 			}
 		}
+
+		return temp;
 	}
-	return temp;
+	else {
+		if (!adaptive) {
+			for (int x = 0; x < img.cols; x++) {
+				for (int y = 0; y < img.rows; y++) {
+					if (temp.at<uchar>(y, x) <= limit) {
+						temp.at<uchar>(y, x) = 0;
+					}
+					if (temp.at<uchar>(y, x) >= limit) {
+						temp.at<uchar>(y, x) = 255;
+					}
+				}
+			}
+			return temp;
+		}
+		else {
+			float T = 127;
+			float tPrev = 0;
+
+
+			while (abs((T - tPrev) / T) >= 0.1) {
+				temp = img.clone();
+
+				int countBelow = 0, countAbove = 0;
+				int sumBelow = 0, sumAbove = 0;
+
+				tPrev = T;
+				for (int x = 0; x < img.cols; x++) {
+					for (int y = 0; y < img.rows; y++) {
+						if (temp.at<uchar>(y, x) <= T) {
+							sumBelow += temp.at<uchar>(y, x);
+							countBelow++;
+							temp.at<uchar>(y, x) = 0;
+						}
+						if (temp.at<uchar>(y, x) > T) {
+							sumAbove += temp.at<uchar>(y, x);
+							countAbove++;
+							temp.at<uchar>(y, x) = 255;
+						}
+					}
+				}
+
+				T = (sumBelow / countBelow + sumAbove / countAbove) / 2.0;
+
+				cout << "T prev: " << tPrev << endl;
+				cout << "T new: " << T << endl;
+				cout << "Change: " << (T - tPrev) / T << endl;
+			}
+
+
+			return temp;
+
+		}
+	}
 }
 
 Mat quantization(Mat img, int bins) {
@@ -374,22 +453,23 @@ int main(int argc, char* argv[]) {
 		system("CLS");
 
 		cout << "Please select which image technique you would like to use:" << endl;
-		cout << "<---------- Enhancement Tools" << endl;
+		cout << "<------------- Enhancement Tools" << endl;
 		cout << "1. Sharpen" << endl;
 		cout << "2. Median Filtering" << endl;
 		cout << "3. Gamma Correction" << endl;
 		cout << "4. Histogram Equalization" << endl;
 		cout << "5. Contrast Stretching" << endl;
-		cout << "<---------- Error Testing Tools" << endl;
+		cout << "<------------- Error Testing Tools" << endl;
 		cout << "6. Gaussian Blur" << endl;
 		cout << "7. Salt and Pepper Noise" << endl;
 		cout << "8. Speckle Noise" << endl;
-		cout << "<---------- Miscellaneous Tools" << endl;
-		cout << "9. Thresholding" << endl;
-		cout << "10. Quantization" << endl;
-		cout << "11. Edge Detection" << endl;
-		cout << "12. Plot Histograms" << endl;
-		cout << "<---------- Settings" << endl;
+		cout << "9. Additive White Noise" << endl;
+		cout << "<------------- Miscellaneous Tools" << endl;
+		cout << "10. Thresholding" << endl;
+		cout << "11. Quantization" << endl;
+		cout << "12. Edge Detection" << endl;
+		cout << "13. Plot Histograms" << endl;
+		cout << "<------------- Settings" << endl;
 		cout << "0. Exit" << endl;
 		cout << "-1. Reset to Original" << endl;
 		cout << "-2. Change Image" << endl;
@@ -458,7 +538,7 @@ int main(int argc, char* argv[]) {
 
 				cout << "Enter the second input gray level: ";
 				cin >> choice;
-				r2= stoi(choice);
+				r2 = stoi(choice);
 
 				cout << "Enter the corresponding output level: ";
 				cin >> choice;
@@ -484,7 +564,7 @@ int main(int argc, char* argv[]) {
 				cin.get();
 				displaying = 0;
 			}
-			
+
 			break;
 		case 6:
 			edited = gaussianBlur(edited);
@@ -540,20 +620,17 @@ int main(int argc, char* argv[]) {
 
 			break;
 		case 9:
-			int lowerlimit, upperlimit;
+			float var;
+
 			try {
-				cout << "What is the value limit for the black threshold (0 has no effect): ";
+				cout << "What is the desired variance of this noise distribution (defualt is 50): ";
 				cin >> choice;
-				lowerlimit = stoi(choice);
+				var = stof(choice);
 
-				cout << "What is the vaule limit for the white threshold (255 has no effect): ";
-				cin >> choice;
-				upperlimit = stoi(choice);
-
-				edited = thresholding(edited, upperlimit, lowerlimit);
+				edited = additiveWhiteNoise(edited, var);
 			}
 			catch (const invalid_argument& error) {
-				cout << "Error: This value must an integer." << endl;
+				cout << "Error: This value must a decimal." << endl;
 				cout << "Press ENTER to continue." << endl;
 
 				cin.clear();
@@ -561,9 +638,65 @@ int main(int argc, char* argv[]) {
 				cin.get();
 				displaying = 0;
 			}
-
 			break;
 		case 10:
+			int limit;
+			cout << "Would you like to use adaptive thresholding (Y/n): ";
+			cin >> choice;
+
+			if (choice == "y" or choice == "Y") {
+				cout << "Would you like to segment the image (Y/n):";
+				cin >> choice;
+
+				if (choice == "y" or choice == "Y") {
+					try {
+						int row, col;
+						cout << "How many rows would you like: ";
+						cin >> choice;
+						row = stoi(choice);
+
+						cout << "How many columns woudl you like: ";
+						cin >> choice;
+						col = stoi(choice);
+
+						edited = thresholding(edited, 0, 0, 1, row, col);
+					}
+					catch (const invalid_argument& error) {
+						cout << "Error: One of the arguments you entered was invalid, the process was cancelled." << endl;
+						cout << "Press ENTER to continue." << endl;
+
+						cin.clear();
+						cin.ignore(numeric_limits<streamsize>::max(), '\n');
+						cin.get();
+						displaying = 0;
+					}
+				}
+
+				else {
+					edited = thresholding(edited, 0, 1);
+				}
+			}
+			else {
+				try {
+					cout << "What is the limit you would like to threshold: ";
+					cin >> choice;
+					limit = stoi(choice);
+
+
+					edited = thresholding(edited, limit, 0);
+				}
+				catch (const invalid_argument& error) {
+					cout << "Error: This value must an integer." << endl;
+					cout << "Press ENTER to continue." << endl;
+
+					cin.clear();
+					cin.ignore(numeric_limits<streamsize>::max(), '\n');
+					cin.get();
+					displaying = 0;
+				}
+			}
+			break;
+		case 11:
 			int bins;
 			try {
 				cout << "How many distinct levels would you like (standard is 255): ";
@@ -590,10 +723,10 @@ int main(int argc, char* argv[]) {
 				displaying = 0;
 			}
 			break;
-		case 11:
+		case 12:
 			edited = edgeDetection(edited);
 			break;
-		case 12:
+		case 13:
 			histogramPlot(originalImg, edited);
 			displaying = 0;
 			break;
