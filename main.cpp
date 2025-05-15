@@ -604,7 +604,7 @@ int main(int argc, char* argv[]) {
 			break;
 		case 8:
 			try {
-				cout << "Please enter the variance of the normal distribution (Standard is 1): ";
+				cout << "Please enter the variance of the normal distribution (Standard is 50): ";
 				cin >> choice;
 				edited = speckleNoise(edited, stof(choice));
 			}
