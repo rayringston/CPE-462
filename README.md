@@ -14,7 +14,7 @@ Cameras generally different responses to light compared to the human visual syst
 Histogram equalization is technique used to improve the contrast of the image. This is a transformation that uses the probablity of a given intensity to compute a more spread out distribution of intensities. Since the pixel intensities will be less concentrated, the image will appear to have better contrast. Additionally, there is a miscellaneous tool called Plot Histogram, that allows you to compare the histograms of the original and edited images.
 
 ### Contrast Stretching
-Contrast stretching allows the user to create linear transformations over certain ranges of the image. 
+Contrast stretching allows the user to create linear transformations over certain ranges of the image. Currently only supports 3 line segment transformations. However, more complex contrast stretching operations would be simple to implement.
 
 # Noise Testing Tools
 
@@ -37,5 +37,3 @@ Thresholding is a technique used to help define certain fetaures in an image. Ou
 
 ### Edge Detection
 
-# Future Add
-Exporting the edited image
